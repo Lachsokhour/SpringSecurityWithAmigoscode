@@ -13,6 +13,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+import java.util.concurrent.TimeUnit;
 
 import static com.springsecurity.security.ApplicationUserPermission.*;
 import static com.springsecurity.security.ApplicationUserRole.*;
@@ -32,6 +36,8 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
+//                .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+//                .and()
                 .csrf().disable()
                 .authorizeRequests()
                 .antMatchers("/","index","/css/*","/js/*").permitAll()
@@ -42,16 +48,44 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
 //                .antMatchers(HttpMethod.PUT,"/management/students/**").hasAuthority(COURSE_WRITE.getPermission())
                 .anyRequest()
                 .authenticated()
+
+                // When the user is logged
                 .and()
-                .httpBasic();
+                .formLogin() // show the user with the form login
+//                .httpBasic();  // show the user with the http basic or popup
+
+                // we can change the form login
+                    .loginPage("/login").permitAll()
+                    .defaultSuccessUrl("/course",true)
+                    .passwordParameter("password")
+                    .usernameParameter("username")
+
+
+                // When the user clicks remember me button
+                .and()
+                .rememberMe()
+                    .tokenValiditySeconds((int) TimeUnit.DAYS.toSeconds(21))
+                    .key("somethingverysecured")
+                    .rememberMeParameter("remember-me")
+
+                // when the user log out
+                .and()
+                .logout()
+                    .deleteCookies("JSESSIONID","remember-me")
+                    .logoutRequestMatcher(new AntPathRequestMatcher("/logout","GET"))
+                    .clearAuthentication(true)
+                    .invalidateHttpSession(true)
+                    .logoutSuccessUrl("/login")
+        ;
     }
 
     @Override
     @Bean
-    public UserDetailsService userDetailsServiceBean() throws Exception {
+    public UserDetailsService userDetailsService() {
         UserDetails sokhour = User.builder()
                 .username("sokhour")
                 .password(passwordEncoder.encode("password"))
+
 //                .roles(STUDENT.name()) // ROLE_STUDENT
                 .authorities(STUDENT.getGrantedAuthorities())
                 .build();
